@@ -1,0 +1,196 @@
+
+<html>
+<head>
+	<style>
+		#container { 
+			width: 644px; 
+			display:block; 
+			float:left; 
+		}
+		#container div { 
+			width: 160px; 
+			height: 160px; 
+			display:block; 
+			float:left; 
+			background: url(http://kamcheng.me/games/slider-puzzle/lion.png) no-repeat;
+			margin: 0 1px 1px 0;
+			cursor:pointer;
+		}
+
+		#autoSolve { 
+			padding: 5px; 
+			background-color: #ccc; 
+			border-radius: 3px 3px 3px 3px; 
+			border:1px solid #000; 
+			margin:20px 0 0 20px; 
+			display:block; 
+			float:left; 
+			width: 200px; 
+			text-align:center; 
+			cursor:pointer;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="container">
+		<div id="d_1"></div>
+		<div id="d_2"></div>
+		<div id="d_3"></div>
+		<div id="d_4"></div>
+		<div id="d_5"></div>
+		<div id="d_6"></div>
+		<div id="d_7"></div>
+		<div id="d_8"></div>
+		<div id="d_9"></div>
+		<div id="d_10"></div>
+		<div id="d_11"></div>
+		<div id="d_12"></div>
+		<div id="d_13"></div>
+		<div id="d_14"></div>
+		<div id="d_15"></div>
+		<div id="e"></div>
+	</div>
+	<a href="#" id="autoSolve">Auto Solve</a>
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+	<script>
+		//-----------------jQuery swap elements plugins
+		jQuery.fn.swapWith = function(to) {
+		    return this.each(function() {
+		        var copy_to = $(to).clone(true);
+		        var copy_from = $(this).clone(true);
+		        $(to).replaceWith(copy_from);
+		        $(this).replaceWith(copy_to);
+		    });
+		};
+
+		//----------- shuffle and track solution
+		/*solution array use for swap puzzle tiles, and keep track of users clicked tiles. 
+		when users ask for 'auto solve', empty tile will swap back with ids(elements) stored in solution array.*/
+		var solutionArr = [15, 11, 10, 9, 5, 1, 2, 6, 7, 8],
+			originalArr = {}, //original puzzle tile positions
+			rows = cols = 1, //rows and cols start with 1
+			solved = false,
+			posRow = posCol = 0; //rows and cols start with 0
+
+		/*apply background image position each div elements*/
+		$.each($('#container div'), function(index){
+			var tileW = 160,
+				tileH = 160,
+				tileLeft=posCol*tileW + "px",  //shows where background images tiles will be placed
+				tileTop=posRow*tileH+"px"; //shows where background images tiles will be placed
+
+			this.style.backgroundPosition = "-" + tileLeft + " -" + tileTop; //eg. background-position: -160px -160px;
+
+			posCol++;
+			if(posCol == 4) { posCol = 0; posRow++; }
+		});
+
+		//swap empty puzzle tile with pre set solution array elements  
+		for(var i=0; i<solutionArr.length; i++){
+		    var el = 'd_' + solutionArr[i];
+		    $('#'+el).swapWith($('#e')); //swap empty tile with elements from the solution array
+		    $('#e').css('background-position','480px 480px'); //set blank background image to the empty tile
+		}
+
+		/*after tiles swaped, we need to know each original tiles current locations based cols and rows
+		  e.g. originalArr.d_1 is in row 1 and col 1, d_8 is in row 2 and col 3, etc.*/
+		$.each($('#container div'), function(index){
+			var id = $(this).attr('id');
+			originalArr[id]={};  //set each elements obj properties value - row/col/order. e.g. el#id d_10 at col 3, row 3, order 11
+			originalArr[id].row = rows;
+			originalArr[id].col = cols;
+			originalArr[id].order = index + 1;
+			cols ++;
+			if(cols == 5) { cols = 1; rows++; } //if col is 4, increase row +1
+		});
+
+		function tileClicked(){
+		    var id = $(this).attr('id'),
+				e_col = originalArr.e.col, //store old empty col/row/order value to swap with clicked tile later
+				e_row = originalArr.e.row,
+				e_order = originalArr.e.order,
+				c_img_col = originalArr[id].col, //store old clicked tile col/row/order value to swap with empty tile later
+				c_img_row = originalArr[id].row,
+				c_img_order = originalArr[id].order;
+
+			if(c_img_col === e_col){ //tiles allow to swap only if its on top or bottom to the empty tile
+				if(c_img_row + 1 === e_row || c_img_row - 1 === e_row) {
+					checkSolution(id);
+				}
+			} else if(c_img_row === e_row){ //tile allow to swap only if its left or right to the empty tile
+				if(c_img_col + 1 === e_col || c_img_col - 1 === e_col) {
+					checkSolution(id);
+				}
+			} else {
+				return;
+			}
+
+			function checkSolution(id){
+				$('#'+id).swapWith($('#e'));
+
+				//update clicked and empty tiles row/col/order values
+				originalArr.e.col = c_img_col;
+				originalArr.e.row = c_img_row;
+				originalArr.e.order = c_img_order;
+
+				originalArr[id].col = e_col;
+				originalArr[id].row = e_row;
+				originalArr[id].order = e_order;
+
+				//push the clicked tile id to solution array
+				var d_id = id.split('_')[1];
+				solutionArr.push(Number(d_id));
+
+				//after swap, checks to see if puzzle solved.
+				if(originalArr.e.order == 16){ //check only if empty tile is in last tile
+					solved = true;
+					for(var x in originalArr){ //immutable original obj to check if each tiles properties value are match - orders match its ids. d_10.split('_')[1] -> 10 === d_10.order is 10
+						var o_id;
+						if(x === 'e') { //string 'e' - empty tile update to number 16 and make the match
+							o_id = 16;
+						} else { 
+							o_id = x.split('_')[1];
+						}
+
+						if(Number(o_id) !== Number(originalArr[x].order)){ //if either of them not match, return solved to false. eg. d_10.split('_')[1] -> 10 !== d_10.order is 11
+							solved = false;
+							break;
+						}
+					}
+				}
+
+				if(solved) {
+					$('#e').css('background-position','-480px -480px'); //if solved, update empty background image
+					setTimeout(function(){alert('Puzzle solved! You are smart!!');}, 300); //congratulations message delay 0.3 sec because make sure alert msg come after updating empty tile bg image.
+				}
+			}
+		}
+
+		function swapBack() {
+			//delay 1 sec to show users step by step swap back tiles to its original puzzle
+		    var c = 0;
+		    var interval = setInterval(function() { 
+		                          var el = 'd_' + solutionArr[c];
+								  $('#'+el).swapWith($('#e')); //swaping
+		                          c++; 
+		                          if(c >= solutionArr.length) {
+									 clearInterval(interval);
+									 $('#e').css('background-position','-480px -480px'); //after swap done, restore empty tile image
+									 setTimeout(function(){alert('Puzzle auto solved!');}, 300); //solved message
+								  }
+		                   }, 800);
+		}
+
+		$('#autoSolve').on('click', function(e){
+			e.preventDefault();
+			//if users click 'auto solve', reverse solution array and swap back one by one with empty tile to the original puzzle image
+			solutionArr.reverse();
+			swapBack();
+		});
+
+		$('#container div').on('click', tileClicked);
+	</script>
+</body>
+</html>
